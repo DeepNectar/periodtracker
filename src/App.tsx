@@ -149,6 +149,7 @@ function AppContent() {
             onEndPeriod={endPeriod}
             onUpdateEntry={updateEntry}
             onDeleteEntry={deleteEntry}
+            onStartPeriod={startPeriod}
           />
         )}
         {screen === 'calendar' && (

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PeriodEntry } from '../lib/supabase';
 import { formatShortDateTime, formatDuration } from '../utils/dates';
 import { useToast } from './Toast';
-import { Droplets, Edit3, Trash2, StopCircle, AlertTriangle, Smile } from 'lucide-react';
+import { Droplets, Edit3, Trash2, StopCircle, AlertTriangle, Smile, Plus } from 'lucide-react';
 
 const SYMPTOMS = ['Cramps', 'Headache', 'Bloating', 'Fatigue', 'Back pain', 'Acne', 'Nausea', 'Insomnia', 'Cravings', 'Breast tenderness', 'Dizziness'];
 const MOODS = ['😊 Happy', '😢 Sad', '😤 Irritable', '😰 Anxious', '😴 Tired', '🥰 Loving', '😐 Neutral', '🤢 Sick'];
@@ -12,9 +12,26 @@ type Props = {
   onEndPeriod: (id: string) => Promise<any>;
   onUpdateEntry: (id: string, updates: Partial<PeriodEntry>) => Promise<any>;
   onDeleteEntry: (id: string) => Promise<void>;
+  onStartPeriod: (flow: string | null, symptoms: string[], notes: string | null, options?: { startDatetime?: string; endDatetime?: string | null }) => Promise<any>;
 };
 
-export function HistoryScreen({ entries, onEndPeriod, onUpdateEntry, onDeleteEntry }: Props) {
+// Convert an ISO datetime string to the value format used by <input type="datetime-local">
+const toLocalInputValue = (iso: string | null): string => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const fromLocalInputValue = (value: string): string | null => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+};
+
+export function HistoryScreen({ entries, onEndPeriod, onUpdateEntry, onDeleteEntry, onStartPeriod }: Props) {
   const [confirmEnd, setConfirmEnd] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -22,6 +39,17 @@ export function HistoryScreen({ entries, onEndPeriod, onUpdateEntry, onDeleteEnt
   const [editSymptoms, setEditSymptoms] = useState<string[]>([]);
   const [editMood, setEditMood] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
+
+  // Manual entry "Add" form
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addStart, setAddStart] = useState('');
+  const [addEnd, setAddEnd] = useState('');
+  const [addFlow, setAddFlow] = useState('Medium');
+  const [addSymptoms, setAddSymptoms] = useState<string[]>([]);
+  const [addMood, setAddMood] = useState('');
+  const [addNotes, setAddNotes] = useState('');
   const { showToast } = useToast();
 
   const handleEnd = async (id: string) => {
@@ -53,16 +81,76 @@ export function HistoryScreen({ entries, onEndPeriod, onUpdateEntry, onDeleteEnt
     setEditSymptoms(regularSymptoms);
     setEditMood(moodSymptom ? moodSymptom.replace('Mood: ', '') : '');
     setEditNotes(entry.notes || '');
+    setEditStart(toLocalInputValue(entry.start_datetime));
+    setEditEnd(toLocalInputValue(entry.end_datetime));
   };
 
   const saveEdit = async (id: string) => {
     try {
+      const startISO = fromLocalInputValue(editStart);
+      const endISO = fromLocalInputValue(editEnd);
+      if (!startISO) {
+        showToast('Please enter a valid start date & time', 'error');
+        return;
+      }
+      if (endISO && new Date(endISO) <= new Date(startISO)) {
+        showToast('End date must be after start date', 'error');
+        return;
+      }
       const allSymptoms = editMood ? [...editSymptoms, `Mood: ${editMood}`] : editSymptoms;
-      await onUpdateEntry(id, { flow: editFlow as any, symptoms: allSymptoms, notes: editNotes || null });
+      const updates: Partial<PeriodEntry> = {
+        flow: editFlow as any,
+        symptoms: allSymptoms,
+        notes: editNotes || null,
+        start_datetime: startISO,
+        end_datetime: endISO,
+      };
+      if (endISO) {
+        updates.status = 'completed';
+        updates.ended_by = endISO;
+      } else {
+        updates.status = 'active';
+        updates.ended_by = null;
+      }
+      await onUpdateEntry(id, updates);
       showToast('Entry updated');
       setEditingId(null);
     } catch (err: any) {
       showToast(err.message || 'Failed to update', 'error');
+    }
+  };
+
+  const resetAddForm = () => {
+    setShowAddForm(false);
+    setAddStart('');
+    setAddEnd('');
+    setAddFlow('Medium');
+    setAddSymptoms([]);
+    setAddMood('');
+    setAddNotes('');
+  };
+
+  const handleManualAdd = async () => {
+    try {
+      const startISO = fromLocalInputValue(addStart);
+      const endISO = fromLocalInputValue(addEnd);
+      if (!startISO) {
+        showToast('Please enter a valid start date & time', 'error');
+        return;
+      }
+      if (endISO && new Date(endISO) <= new Date(startISO)) {
+        showToast('End date must be after start date', 'error');
+        return;
+      }
+      const allSymptoms = addMood ? [...addSymptoms, `Mood: ${addMood}`] : addSymptoms;
+      await onStartPeriod(addFlow as any, allSymptoms, addNotes || null, {
+        startDatetime: startISO,
+        endDatetime: endISO,
+      });
+      showToast(endISO ? 'Period entry added' : 'Ongoing period entry added');
+      resetAddForm();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to add entry', 'error');
     }
   };
 
@@ -72,23 +160,103 @@ export function HistoryScreen({ entries, onEndPeriod, onUpdateEntry, onDeleteEnt
     return moodSymptom ? moodSymptom.replace('Mood: ', '') : null;
   };
 
+  const addForm = (
+    <div className="rounded-2xl p-4 border bg-white dark:bg-gray-800 border-pink-200 dark:border-pink-800 shadow-sm mb-4">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">New Manual Entry</h3>
+      <div className="grid grid-cols-1 gap-3 mb-3">
+        <div>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Start Date &amp; Time *</label>
+          <input type="datetime-local" value={addStart} onChange={e => setAddStart(e.target.value)}
+            className="mt-1 w-full p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-200 focus:outline-none" />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">End Date &amp; Time (leave empty if ongoing)</label>
+          <input type="datetime-local" value={addEnd} onChange={e => setAddEnd(e.target.value)}
+            className="mt-1 w-full p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-200 focus:outline-none" />
+        </div>
+      </div>
+      <div className="mb-3">
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Flow</label>
+        <div className="flex gap-2 mt-1">
+          {['Light', 'Medium', 'Heavy'].map(f => (
+            <button key={f} onClick={() => setAddFlow(f)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium ${addFlow === f ? 'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-transparent'}`}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mb-3">
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Mood</label>
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {MOODS.map(m => (
+            <button key={m} onClick={() => setAddMood(addMood === m ? '' : m)}
+              className={`px-2 py-1 rounded-full text-[10px] font-medium ${addMood === m ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-700' : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600'}`}>
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mb-3">
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Symptoms</label>
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {SYMPTOMS.map(sy => (
+            <button key={sy} onClick={() => setAddSymptoms(prev => prev.includes(sy) ? prev.filter(x => x !== sy) : [...prev, sy])}
+              className={`px-2 py-1 rounded-full text-[10px] font-medium ${addSymptoms.includes(sy) ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300' : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
+              {sy}
+            </button>
+          ))}
+        </div>
+      </div>
+      <textarea value={addNotes} onChange={e => setAddNotes(e.target.value)} placeholder="Notes (optional)"
+        className="w-full p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-200 resize-none h-16 mb-3 focus:outline-none" />
+      <div className="flex gap-2">
+        <button onClick={resetAddForm} className="flex-1 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium">Cancel</button>
+        <button onClick={handleManualAdd} className="flex-1 py-2 rounded-lg bg-pink-400 text-white text-xs font-medium">Add Entry</button>
+      </div>
+    </div>
+  );
+
   if (entries.length === 0) {
     return (
       <div className="px-4 pb-24 pt-6">
-        <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-6">History</h1>
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="text-6xl mb-4">📋</div>
-          <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300">No entries yet</h3>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 text-center">Start tracking your period to see your history here</p>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">History</h1>
+          {!showAddForm && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-pink-400 text-white text-xs font-medium hover:bg-pink-500 transition-colors"
+            >
+              <Plus size={14} /> Add Entry
+            </button>
+          )}
         </div>
+        {showAddForm && addForm}
+        {!showAddForm && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="text-6xl mb-4">📋</div>
+            <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300">No entries yet</h3>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 text-center">Start tracking your period or add a manual entry to see your history here</p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="px-4 pb-24 pt-6">
-      <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">History</h1>
-      
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">History</h1>
+        <button
+          onClick={() => setShowAddForm(prev => !prev)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-pink-400 text-white text-xs font-medium hover:bg-pink-500 transition-colors"
+        >
+          <Plus size={14} /> {showAddForm ? 'Close' : 'Add Entry'}
+        </button>
+      </div>
+
+      {showAddForm && addForm}
+
       <div className="space-y-4">
         {entries.map(entry => {
           const mood = extractMood(entry.symptoms);
@@ -105,6 +273,18 @@ export function HistoryScreen({ entries, onEndPeriod, onUpdateEntry, onDeleteEnt
           >
             {editingId === entry.id ? (
               <div>
+                <div className="grid grid-cols-1 gap-3 mb-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Start Date &amp; Time *</label>
+                    <input type="datetime-local" value={editStart} onChange={e => setEditStart(e.target.value)}
+                      className="mt-1 w-full p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-200 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">End Date &amp; Time (leave empty if ongoing)</label>
+                    <input type="datetime-local" value={editEnd} onChange={e => setEditEnd(e.target.value)}
+                      className="mt-1 w-full p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-200 focus:outline-none" />
+                  </div>
+                </div>
                 <div className="mb-3">
                   <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Flow</label>
                   <div className="flex gap-2 mt-1">
