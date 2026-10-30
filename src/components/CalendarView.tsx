@@ -3,14 +3,17 @@ import { PeriodEntry } from '../lib/supabase';
 import { getCalendarDays, isSameDay, isDateInRange, calculateCycleStats, getCyclePhase, getPhaseInfo } from '../utils/dates';
 import { format, parseISO, startOfDay, differenceInDays, addDays } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { DayLogSheet } from './DayLogSheet';
 
 type Props = {
   entries: PeriodEntry[];
+  onEndPeriod?: (id: string) => Promise<any>;
+  onUpdateEntry?: (id: string, updates: Partial<PeriodEntry>) => Promise<any>;
 };
 
 type DayStatus = 'period' | 'predicted' | 'fertile' | 'ovulation' | 'pms' | 'follicular' | 'luteal' | 'none';
 
-export function CalendarView({ entries }: Props) {
+export function CalendarView({ entries, onEndPeriod, onUpdateEntry }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
@@ -218,6 +221,14 @@ export function CalendarView({ entries }: Props) {
               )}
             </div>
           )}
+
+          {/* Log this day — period-tracker.org style per-day logging */}
+          <DayLogSheet
+            day={selectedDay}
+            entries={entries}
+            onEndPeriod={onEndPeriod}
+            onUpdateEntry={onUpdateEntry}
+          />
         </div>
       )}
     </div>
