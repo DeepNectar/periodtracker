@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { ToastProvider, useToast } from './components/Toast';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './components/HomeScreen';
+import { TodayScreen } from './components/TodayScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { CalendarView } from './components/CalendarView';
 import { InsightsScreen } from './components/InsightsScreen';
+import { PredictionsScreen } from './components/PredictionsScreen';
+import { ToolsScreen } from './components/ToolsScreen';
 import { usePeriodData } from './hooks/usePeriodData';
 import { Moon, Sun, RefreshCw, AlertCircle, Database } from 'lucide-react';
 
-type Screen = 'home' | 'history' | 'calendar' | 'insights';
+type Screen = 'home' | 'today' | 'history' | 'calendar' | 'predictions' | 'tools' | 'insights';
 
 function AppContent() {
   const [screen, setScreen] = useState<Screen>('home');
@@ -131,6 +134,13 @@ function AppContent() {
             activeEntry={activeEntry}
             entries={entries}
             onStartPeriod={startPeriod}
+            onNavigate={(s) => setScreen(s as Screen)}
+          />
+        )}
+        {screen === 'today' && (
+          <TodayScreen
+            entries={entries}
+            onStartPeriod={startPeriod}
           />
         )}
         {screen === 'history' && (
@@ -142,7 +152,13 @@ function AppContent() {
           />
         )}
         {screen === 'calendar' && (
-          <CalendarView entries={entries} />
+          <CalendarView entries={entries} onEndPeriod={endPeriod} onUpdateEntry={updateEntry} />
+        )}
+        {screen === 'predictions' && (
+          <PredictionsScreen entries={entries} />
+        )}
+        {screen === 'tools' && (
+          <ToolsScreen entries={entries} />
         )}
         {screen === 'insights' && (
           <InsightsScreen entries={entries} />
