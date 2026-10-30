@@ -1,6 +1,6 @@
-import { Home, History, Calendar, Lightbulb, Sparkles, Sun } from 'lucide-react';
+import { Home, History, Calendar, Lightbulb, Sparkles, Sun, Wrench } from 'lucide-react';
 
-type Screen = 'home' | 'today' | 'history' | 'calendar' | 'predictions' | 'insights';
+type Screen = 'home' | 'today' | 'history' | 'calendar' | 'predictions' | 'tools' | 'insights';
 
 export function BottomNav({ current, onChange }: { current: Screen; onChange: (s: Screen) => void }) {
   const items: { id: Screen; label: string; icon: React.ReactNode }[] = [
@@ -9,6 +9,7 @@ export function BottomNav({ current, onChange }: { current: Screen; onChange: (s
     { id: 'history', label: 'History', icon: <History size={20} /> },
     { id: 'calendar', label: 'Calendar', icon: <Calendar size={20} /> },
     { id: 'predictions', label: 'Predictions', icon: <Sparkles size={20} /> },
+    { id: 'tools', label: 'Tools', icon: <Wrench size={20} /> },
     { id: 'insights', label: 'Insights', icon: <Lightbulb size={20} /> },
   ];
 

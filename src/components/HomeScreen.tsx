@@ -5,7 +5,7 @@ import { PeriodEntry } from '../lib/supabase';
 import { formatShortDateTime, formatDuration, calculateCycleStats, getCyclePhase, getPhaseInfo, predictFertileWindow, predictNextPeriod } from '../utils/dates';
 import { buildPredictions, formatDateShort, countdownLabel } from '../utils/predictions';
 import { format, differenceInDays, parseISO, addDays } from 'date-fns';
-import { Droplets, Clock, Calendar, ChevronRight, Heart, Sparkles, Moon, Sun } from 'lucide-react';
+import { Droplets, Clock, Calendar, ChevronRight, Heart, Sparkles, Moon, Sun, Wrench } from 'lucide-react';
 
 const SYMPTOMS = ['Cramps', 'Headache', 'Bloating', 'Fatigue', 'Back pain', 'Acne', 'Nausea', 'Insomnia', 'Cravings', 'Breast tenderness', 'Dizziness'];
 const MOODS = ['😊 Happy', '😢 Sad', '😤 Irritable', '😰 Anxious', '😴 Tired', '🥰 Loving', '😐 Neutral', '🤢 Sick'];
@@ -14,9 +14,10 @@ type Props = {
   activeEntry: PeriodEntry | null;
   entries: PeriodEntry[];
   onStartPeriod: (flow: string | null, symptoms: string[], notes: string | null) => Promise<any>;
+  onNavigate?: (screen: string) => void;
 };
 
-export function HomeScreen({ activeEntry, entries, onStartPeriod }: Props) {
+export function HomeScreen({ activeEntry, entries, onStartPeriod, onNavigate }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [flow, setFlow] = useState<string>('Medium');
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
@@ -112,12 +113,22 @@ export function HomeScreen({ activeEntry, entries, onStartPeriod }: Props) {
 
       {/* Start Button */}
       {!activeEntry && !showForm && (
-        <button
-          onClick={() => setShowForm(true)}
-          className="mt-4 w-full py-4 rounded-2xl bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 text-white font-semibold text-base shadow-lg shadow-pink-200 dark:shadow-pink-900/30 transition-all duration-200 active:scale-[0.98]"
-        >
-          🩸 Start Period
-        </button>
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 text-white font-semibold text-base shadow-lg shadow-pink-200 dark:shadow-pink-900/30 transition-all duration-200 active:scale-[0.98]"
+          >
+            🩸 Start Period
+          </button>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('tools')}
+              className="flex-1 py-4 rounded-2xl bg-white dark:bg-gray-800 border-2 border-pink-200 dark:border-pink-800 text-pink-500 font-semibold text-base shadow-sm transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <Wrench size={18} /> Tools
+            </button>
+          )}
+        </div>
       )}
 
       {/* Start Form */}

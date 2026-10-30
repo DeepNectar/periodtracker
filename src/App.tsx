@@ -7,10 +7,11 @@ import { HistoryScreen } from './components/HistoryScreen';
 import { CalendarView } from './components/CalendarView';
 import { InsightsScreen } from './components/InsightsScreen';
 import { PredictionsScreen } from './components/PredictionsScreen';
+import { ToolsScreen } from './components/ToolsScreen';
 import { usePeriodData } from './hooks/usePeriodData';
 import { Moon, Sun, RefreshCw, AlertCircle, Database } from 'lucide-react';
 
-type Screen = 'home' | 'today' | 'history' | 'calendar' | 'predictions' | 'insights';
+type Screen = 'home' | 'today' | 'history' | 'calendar' | 'predictions' | 'tools' | 'insights';
 
 function AppContent() {
   const [screen, setScreen] = useState<Screen>('home');
@@ -133,6 +134,7 @@ function AppContent() {
             activeEntry={activeEntry}
             entries={entries}
             onStartPeriod={startPeriod}
+            onNavigate={(s) => setScreen(s as Screen)}
           />
         )}
         {screen === 'today' && (
@@ -154,6 +156,9 @@ function AppContent() {
         )}
         {screen === 'predictions' && (
           <PredictionsScreen entries={entries} />
+        )}
+        {screen === 'tools' && (
+          <ToolsScreen entries={entries} />
         )}
         {screen === 'insights' && (
           <InsightsScreen entries={entries} />
