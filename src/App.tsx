@@ -55,59 +55,17 @@ function AppContent() {
   if (error === 'TABLE_NOT_FOUND') {
     return (
       <div className="flex items-center justify-center min-h-screen bg-pink-50 dark:bg-gray-950 p-6">
-        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-lg border border-pink-100 dark:border-gray-700">
-          <div className="text-center mb-4">
-            <Database size={40} className="mx-auto text-pink-400 mb-3" />
-            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Database Setup Required</h2>
-          </div>
+        <div className="max-w-sm w-full bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-lg text-center">
+          <Database size={40} className="mx-auto text-pink-400 mb-3" />
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2">Setup Required</h2>
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-            The required database tables don't exist yet. Please run the following SQL in your Supabase SQL Editor:
+            The database needs to be configured. Please contact the app administrator or run the database migration.
           </p>
-          <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-3 overflow-auto max-h-64 mb-4">
-            <pre className="text-[10px] text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap">
-{`-- Create period_entries table
-CREATE TABLE period_entries (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  start_datetime timestamptz NOT NULL,
-  end_datetime timestamptz,
-  status text DEFAULT 'active',
-  flow text,
-  symptoms text[],
-  notes text,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  ended_by timestamptz
-);
-
--- Create monthly_insights table
-CREATE TABLE monthly_insights (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  month text NOT NULL,
-  insight_json jsonb,
-  generated_at timestamptz DEFAULT now()
-);
-
--- Enable RLS
-ALTER TABLE period_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE monthly_insights ENABLE ROW LEVEL SECURITY;
-
--- Allow all operations for this private app
-CREATE POLICY "Allow all for anon" ON period_entries
-  FOR ALL USING (true) WITH CHECK (true);
-
-CREATE POLICY "Allow all for anon" ON monthly_insights
-  FOR ALL USING (true) WITH CHECK (true);
-
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE period_entries;
-ALTER PUBLICATION supabase_realtime ADD TABLE monthly_insights;`}
-            </pre>
-          </div>
           <button
             onClick={() => window.location.reload()}
             className="w-full py-3 rounded-xl bg-pink-400 text-white font-medium text-sm"
           >
-            I've run the SQL — Reload App
+            Retry
           </button>
         </div>
       </div>
