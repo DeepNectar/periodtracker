@@ -1,20 +1,14 @@
 -- ============================================================
--- PERIOD TRACKER - CLEAN DATABASE SETUP
--- Drops existing tables and recreates them fresh
+-- PERIOD TRACKER - COMPLETE DATABASE SETUP
+-- This script is safe to run multiple times
 -- ============================================================
 
--- Remove existing triggers first
-DROP TRIGGER IF EXISTS update_period_entries_updated_at ON period_entries;
-DROP TRIGGER IF EXISTS update_monthly_insights_updated_at ON monthly_insights;
-
--- Drop existing tables
+-- Step 1: Clean up existing structures (safe even if they don't exist)
 DROP TABLE IF EXISTS period_entries CASCADE;
 DROP TABLE IF EXISTS monthly_insights CASCADE;
+DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
 
--- Drop the helper function
-DROP FUNCTION IF EXISTS update_updated_at_column();
-
--- 1. Create period_entries table
+-- Step 2: Create period_entries table
 CREATE TABLE period_entries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   start_datetime timestamptz NOT NULL,
@@ -28,7 +22,7 @@ CREATE TABLE period_entries (
   ended_by timestamptz
 );
 
--- 2. Create monthly_insights table
+-- Step 3: Create monthly_insights table
 CREATE TABLE monthly_insights (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   month text NOT NULL UNIQUE,
@@ -36,31 +30,32 @@ CREATE TABLE monthly_insights (
   generated_at timestamptz DEFAULT now()
 );
 
--- 3. Indexes
+-- Step 4: Create indexes
 CREATE INDEX idx_period_entries_status ON period_entries(status);
 CREATE INDEX idx_period_entries_start ON period_entries(start_datetime DESC);
 CREATE INDEX idx_monthly_insights_month ON monthly_insights(month);
 
--- 4. Enable RLS
+-- Step 5: Enable Row Level Security
 ALTER TABLE period_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monthly_insights ENABLE ROW LEVEL SECURITY;
 
--- 5. RLS Policies
+-- Step 6: Create RLS Policies for period_entries
 CREATE POLICY "allow_select_period_entries" ON period_entries FOR SELECT USING (true);
 CREATE POLICY "allow_insert_period_entries" ON period_entries FOR INSERT WITH CHECK (true);
 CREATE POLICY "allow_update_period_entries" ON period_entries FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "allow_delete_period_entries" ON period_entries FOR DELETE USING (true);
 
+-- Step 7: Create RLS Policies for monthly_insights
 CREATE POLICY "allow_select_monthly_insights" ON monthly_insights FOR SELECT USING (true);
 CREATE POLICY "allow_insert_monthly_insights" ON monthly_insights FOR INSERT WITH CHECK (true);
 CREATE POLICY "allow_update_monthly_insights" ON monthly_insights FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "allow_delete_monthly_insights" ON monthly_insights FOR DELETE USING (true);
 
--- 6. Enable Realtime
+-- Step 8: Enable Realtime for both tables
 ALTER PUBLICATION supabase_realtime ADD TABLE period_entries;
 ALTER PUBLICATION supabase_realtime ADD TABLE monthly_insights;
 
--- 7. Auto-update trigger function
+-- Step 9: Create auto-update trigger function
 CREATE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -69,6 +64,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Step 10: Create triggers
 CREATE TRIGGER update_period_entries_updated_at
   BEFORE UPDATE ON period_entries
   FOR EACH ROW
@@ -80,5 +76,5 @@ CREATE TRIGGER update_monthly_insights_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================
--- DONE! Database is ready.
+-- SUCCESS! Database is ready for the Period Tracker app.
 -- ============================================================
