@@ -3,6 +3,7 @@ import { LiveClock } from './LiveClock';
 import { useToast } from './Toast';
 import { PeriodEntry } from '../lib/supabase';
 import { formatShortDateTime, formatDuration, calculateCycleStats, getCyclePhase, getPhaseInfo, predictFertileWindow, predictNextPeriod } from '../utils/dates';
+import { buildPredictions, formatDateShort, countdownLabel } from '../utils/predictions';
 import { format, differenceInDays, parseISO, addDays } from 'date-fns';
 import { Droplets, Clock, Calendar, ChevronRight, Heart, Sparkles, Moon, Sun } from 'lucide-react';
 
@@ -298,6 +299,43 @@ export function HomeScreen({ activeEntry, entries, onStartPeriod }: Props) {
           <p className="text-[10px] text-gray-500 dark:text-gray-400">Next Period</p>
         </div>
       </div>
+
+      {/* Prediction Summary Card */}
+      {(() => {
+        const p = buildPredictions(entries);
+        if (!p.hasData) return null;
+        return (
+          <div className="mt-4 rounded-2xl p-4 bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-violet-950/30 dark:to-fuchsia-950/30 border border-violet-100 dark:border-violet-900/30 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-violet-600 dark:text-violet-300 uppercase tracking-wide">🔮 Your Predictions</h3>
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                p.confidence === 'high' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                : p.confidence === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
+                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+              }`}>{p.confidence}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl bg-white/70 dark:bg-gray-900/40 py-2.5">
+                <p className="text-sm font-bold text-pink-600 dark:text-pink-400">{formatDateShort(p.nextPeriodDate)}</p>
+                <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">Next period · {countdownLabel(p.daysUntilNextPeriod)}</p>
+              </div>
+              <div className="rounded-xl bg-white/70 dark:bg-gray-900/40 py-2.5">
+                <p className="text-sm font-bold text-purple-600 dark:text-purple-400">{formatDateShort(p.ovulationDate)}</p>
+                <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">Ovulation · {countdownLabel(p.daysUntilOvulation)}</p>
+              </div>
+              <div className="rounded-xl bg-white/70 dark:bg-gray-900/40 py-2.5">
+                <p className="text-sm font-bold text-green-600 dark:text-green-400">{p.fertileStart ? format(parseISO(p.fertileStart), 'd MMM') : '—'}</p>
+                <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">Fertile window opens</p>
+              </div>
+            </div>
+            {p.isPeriodLate && (
+              <p className="mt-2 text-center text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                ⚠️ Your period looks {p.lateByDays} day{p.lateByDays > 1 ? 's' : ''} late — cycles can shift for many reasons.
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Cycle Phase Timeline */}
       {!activeEntry && lastStart && (
