@@ -2,6 +2,36 @@
 // (cycle calculator, due date & conception, ovulation, BBT, PMS guide)
 
 import { differenceInDays, addDays, format } from 'date-fns';
+import type { PeriodEntry } from '../lib/supabase';
+
+// ---------- auto data helpers (first day of last period etc.) ----------
+
+/** Entries sorted newest-start first. */
+export function sortEntriesDesc(entries: PeriodEntry[]): PeriodEntry[] {
+  return [...entries].sort(
+    (a, b) => new Date(b.start_datetime).getTime() - new Date(a.start_datetime).getTime()
+  );
+}
+
+/**
+ * First day of the LAST period, taken automatically from logged data.
+ * Prefers the currently active period if one exists (it IS the last period),
+ * otherwise the most recent start. Returns a YYYY-MM-DD key or null.
+ */
+export function getLastPeriodStartKey(entries: PeriodEntry[]): string | null {
+  if (!entries || entries.length === 0) return null;
+  const active = entries.find((e) => e.status === 'active' && e.start_datetime);
+  const source = active ?? sortEntriesDesc(entries)[0];
+  return source?.start_datetime ? source.start_datetime.slice(0, 10) : null;
+}
+
+/** All period start dates (YYYY-MM-DD keys), oldest first — used by the Cycle Length Calculator. */
+export function getPeriodStartKeys(entries: PeriodEntry[]): string[] {
+  return entries
+    .map((e) => e.start_datetime?.slice(0, 10))
+    .filter(Boolean)
+    .sort() as string[];
+}
 
 // ---------- helpers ----------
 

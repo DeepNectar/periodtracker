@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PeriodEntry } from '../lib/supabase';
 import { todayKey } from '../utils/dailyLog';
 import { calculateCycleStats } from '../utils/dates';
@@ -13,6 +13,8 @@ import {
   PMS_GENERAL_TIPS,
   fmtDate,
   fmtDateShort,
+  getLastPeriodStartKey,
+  getPeriodStartKeys,
 } from '../utils/tools';
 import { format } from 'date-fns';
 
@@ -63,10 +65,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 // ---------- 1. Cycle Length Calculator ----------
 
 function CycleLengthTool({ entries }: { entries: PeriodEntry[] }) {
-  const autoStarts = useMemo(
-    () => entries.map((e) => e.start_datetime.slice(0, 10)).sort().join(','),
-    [entries]
-  );
+  const autoStarts = useMemo(() => getPeriodStartKeys(entries), [entries]);
   const [manual, setManual] = useState('');
   const useManual = manual.trim().length > 0;
   const starts = useMemo(() => {
@@ -76,7 +75,7 @@ function CycleLengthTool({ entries }: { entries: PeriodEntry[] }) {
         .map((s) => s.trim())
         .filter(Boolean);
     }
-    return autoStarts ? autoStarts.split(',') : [];
+    return autoStarts;
   }, [useManual, manual, autoStarts]);
 
   const result = useMemo(() => {
@@ -91,15 +90,22 @@ function CycleLengthTool({ entries }: { entries: PeriodEntry[] }) {
     <div className="space-y-4">
       <div className={card}>
         <SectionTitle>📥 Your period start dates</SectionTitle>
-        {!useManual && starts.length >= 2 && (
+        {!useManual && starts.length >= 1 && (
           <div className="mb-3 bg-pink-50 dark:bg-pink-900/20 rounded-2xl p-3">
             <p className="text-xs font-semibold text-pink-600 dark:text-pink-300 mb-1">
-              Using {starts.length} periods from your logged history ✨
+              {starts.length >= 2
+                ? `Using ${starts.length} periods from your logged history ✨`
+                : `Auto-filled from your logged history ✨ — log one more period to calculate an average`}
             </p>
             <p className="text-[11px] text-gray-500 dark:text-gray-400">
               {starts.slice(-8).map(fmtDateShort).join(' · ')}
             </p>
           </div>
+        )}
+        {!useManual && starts.length === 0 && (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
+            No periods logged yet — the calculator auto-fills from your history once you log periods, or enter dates below.
+          </p>
         )}
         <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
           Or enter your own (comma-separated, YYYY-MM-DD):
@@ -177,10 +183,18 @@ function CycleLengthTool({ entries }: { entries: PeriodEntry[] }) {
 
 // ---------- 2. Pregnancy Due Date Calculator ----------
 
-function DueDateTool() {
+function DueDateTool({ entries }: { entries: PeriodEntry[] }) {
+  const autoLmp = useMemo(() => getLastPeriodStartKey(entries), [entries]);
   const [method, setMethod] = useState<DueDateMethod>('lmp');
-  const [date, setDate] = useState('');
+  // Auto-filled with the first day of the last period from logged data
+  const [date, setDate] = useState(autoLmp ?? '');
+  const [overridden, setOverridden] = useState(false);
   const [ivfDay, setIvfDay] = useState<number>(5);
+
+  // Keep the auto value in sync until the user manually picks a date
+  useEffect(() => {
+    if (!overridden && autoLmp) setDate(autoLmp);
+  }, [autoLmp, overridden]);
 
   const result = useMemo(() => {
     if (!date) return null;
@@ -219,7 +233,30 @@ function DueDateTool() {
         <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-2">
           {methods.find((m) => m.id === method)?.hint}
         </p>
-        <input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} />
+        {method === 'lmp' && autoLmp && !overridden && (
+          <div className="mb-2 bg-pink-50 dark:bg-pink-900/20 rounded-2xl p-2.5 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold text-pink-600 dark:text-pink-300">
+              ✨ Auto-filled from your logged period ({fmtDateShort(autoLmp)})
+            </p>
+            <button
+              onClick={() => { setOverridden(true); setDate(''); }}
+              className="text-[10px] font-bold text-gray-400 hover:text-pink-500 underline shrink-0"
+            >
+              Change
+            </button>
+          </div>
+        )}
+        {method === 'lmp' && !autoLmp && (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
+            No period logged yet — enter it manually below. It will auto-fill once you log a period.
+          </p>
+        )}
+        <input
+          type="date"
+          className={inputCls}
+          value={date}
+          onChange={(e) => { setOverridden(true); setDate(e.target.value); }}
+        />
         {method === 'ivf-transfer' && (
           <div className="mt-3">
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Embryo age at transfer</label>
@@ -274,9 +311,14 @@ function DueDateTool() {
 
 function OvulationTool({ entries }: { entries: PeriodEntry[] }) {
   const stats = useMemo(() => calculateCycleStats(entries), [entries]);
-  const lastStart = entries[0]?.start_datetime?.slice(0, 10) ?? '';
-  const [start, setStart] = useState(lastStart);
+  const autoStart = useMemo(() => getLastPeriodStartKey(entries), [entries]);
+  const [start, setStart] = useState(autoStart ?? '');
+  const [overridden, setOverridden] = useState(false);
   const [len, setLen] = useState<number>(stats.avgCycleLength);
+
+  useEffect(() => {
+    if (!overridden && autoStart) setStart(autoStart);
+  }, [autoStart, overridden]);
 
   const result = useMemo(() => {
     if (!start) return null;
@@ -292,7 +334,17 @@ function OvulationTool({ entries }: { entries: PeriodEntry[] }) {
       <div className={card}>
         <SectionTitle>🥚 Calculate your ovulation & fertile window</SectionTitle>
         <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">First day of your last period</label>
-        <input type="date" className={inputCls} value={start} onChange={(e) => setStart(e.target.value)} />
+        {autoStart && !overridden && (
+          <p className="text-[11px] font-semibold text-pink-600 dark:text-pink-300 mb-1.5">
+            ✨ Auto-filled from your logged period ({fmtDateShort(autoStart)}) — change below if needed
+          </p>
+        )}
+        <input
+          type="date"
+          className={inputCls}
+          value={start}
+          onChange={(e) => { setOverridden(true); setStart(e.target.value); }}
+        />
         <label className="text-xs text-gray-500 dark:text-gray-400 block mt-3 mb-1">
           Average cycle length: <b className="text-pink-500">{len} days</b>
           {entries.length > 0 && <span className="ml-1">(your logged average is {stats.avgCycleLength})</span>}
@@ -602,7 +654,7 @@ export function ToolsScreen({ entries }: Props) {
           <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">{tool.name}</h2>
         </div>
         {tool.id === 'cycle-length' && <CycleLengthTool entries={entries} />}
-        {tool.id === 'due-date' && <DueDateTool />}
+        {tool.id === 'due-date' && <DueDateTool entries={entries} />}
         {tool.id === 'ovulation' && <OvulationTool entries={entries} />}
         {tool.id === 'bbt' && <BbtTool />}
         {tool.id === 'pms' && <PmsTool />}
