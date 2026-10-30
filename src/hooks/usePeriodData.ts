@@ -58,15 +58,26 @@ export function usePeriodData() {
     };
   }, [fetchEntries]);
 
-  const startPeriod = async (flow: string | null, symptoms: string[], notes: string | null) => {
+  const startPeriod = async (
+    flow: string | null,
+    symptoms: string[],
+    notes: string | null,
+    options?: { startDatetime?: string; endDatetime?: string | null }
+  ) => {
     const now = new Date().toISOString();
+    const startDatetime = options?.startDatetime || now;
+    const endDatetime = options?.endDatetime ?? null;
+    const isCompleted = !!endDatetime && new Date(endDatetime).getTime() <= Date.now();
+
     const { data, error: insertError } = await supabase
       .from('period_entries')
       .insert({
-        start_datetime: now,
+        start_datetime: startDatetime,
+        end_datetime: endDatetime,
+        ended_by: isCompleted ? endDatetime : null,
         created_at: now,
         updated_at: now,
-        status: 'active',
+        status: isCompleted ? 'completed' : 'active',
         flow,
         symptoms,
         notes
